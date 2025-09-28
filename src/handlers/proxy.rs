@@ -2,10 +2,11 @@ use axum::{body::Body, extract::Request, http::StatusCode, response::Response};
 use reqwest::Client;
 use std::sync::Arc;
 
-use crate::load_balancer::LoadBalancer;
+use crate::{load_balancer::LoadBalancer, metrics::MetricsCollector};
 
 pub async fn proxy_handler(
     load_balancer: Arc<LoadBalancer>,
+    metrics: Arc<MetricsCollector>,
     req: Request,
 ) -> Result<Response<Body>, StatusCode> {
     let client = Client::new();
@@ -17,6 +18,7 @@ pub async fn proxy_handler(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     for attempt in 0..3 {
+        metrics.increment("requests.total");
         let backend = match load_balancer.next_backend() {
             Some(b) => b,
             None => {
@@ -36,6 +38,8 @@ pub async fn proxy_handler(
             .await
         {
             Ok(response) => {
+                load_balancer.report_success(&backend);
+                metrics.increment("requests.success");
                 let mut builder = Response::builder().status(response.status());
                 for (key, value) in response.headers() {
                     builder = builder.header(key, value);
@@ -46,7 +50,9 @@ pub async fn proxy_handler(
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
             }
             Err(_) => {
+                load_balancer.report_failure(&backend);
                 if attempt == 2 {
+                    metrics.increment("requests.failure");
                     return Err(StatusCode::INTERNAL_SERVER_ERROR);
                 }
                 continue;

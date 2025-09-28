@@ -21,10 +21,10 @@ pub fn create_router(
 ) -> Router {
     let mut router = Router::new();
     router = router.route("/health", get(health_handler));
-    let metrics_clone = Arc::clone(&metrics);
+    let metrics_for_handler = Arc::clone(&metrics);
     router = router.route(
         "/metrics",
-        get(async move || metrics_handler(metrics_clone).await),
+        get(async move || metrics_handler(metrics_for_handler).await),
     );
     let registry_clone = Arc::clone(&registry);
     router = router.route(
@@ -37,6 +37,7 @@ pub fn create_router(
             Arc::clone(&registry),
         ));
         let rate_limiter_clone = Arc::clone(&rate_limiter);
+        let metrics_clone = Arc::clone(&metrics);
         router = router.route(
             &route.path,
             any(async move |req: Request| {
@@ -46,7 +47,7 @@ pub fn create_router(
                         .body(axum::body::Body::from("Rate limit exceeded"))
                         .unwrap();
                 }
-                match proxy_handler(Arc::clone(&load_balancer), req).await {
+                match proxy_handler(Arc::clone(&load_balancer), metrics_clone, req).await {
                     Ok(resp) => resp,
                     Err(status) => axum::response::Response::builder()
                         .status(status)
