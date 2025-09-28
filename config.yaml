@@ -1,0 +1,6 @@
+port: 3000
+routes:
+  - path: "/api/users"
+    backend: "http://localhost:4000"
+  - path: "/api/orders"
+    backend: "http://localhost:5000"
