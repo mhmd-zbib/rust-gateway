@@ -3,6 +3,7 @@ use crate::{
     load_balancer::LoadBalancer,
     metrics::MetricsCollector,
     models::Config,
+    rate_limiter::InMemoryRateLimiter,
     registry::Registry,
 };
 use axum::{
@@ -15,6 +16,7 @@ use std::sync::Arc;
 pub fn create_router(
     registry: Arc<Registry>,
     metrics: Arc<MetricsCollector>,
+    rate_limiter: Arc<InMemoryRateLimiter>,
     config: &Config,
 ) -> Router {
     let mut router = Router::new();
@@ -34,9 +36,24 @@ pub fn create_router(
             route.service.clone(),
             Arc::clone(&registry),
         ));
+        let rate_limiter_clone = Arc::clone(&rate_limiter);
         router = router.route(
             &route.path,
-            any(async move |req: Request| proxy_handler(Arc::clone(&load_balancer), req).await),
+            any(async move |req: Request| {
+                if !rate_limiter_clone.check("global") {
+                    return axum::response::Response::builder()
+                        .status(axum::http::StatusCode::TOO_MANY_REQUESTS)
+                        .body(axum::body::Body::from("Rate limit exceeded"))
+                        .unwrap();
+                }
+                match proxy_handler(Arc::clone(&load_balancer), req).await {
+                    Ok(resp) => resp,
+                    Err(status) => axum::response::Response::builder()
+                        .status(status)
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                }
+            }),
         );
     }
     router
