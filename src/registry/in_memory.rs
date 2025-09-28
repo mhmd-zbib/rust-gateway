@@ -15,7 +15,7 @@ impl Registry {
 
     pub fn register(&self, service: String, url: String) {
         let mut services = self.services.lock().unwrap();
-        services.entry(service).or_insert_with(Vec::new).push(url);
+        services.entry(service).or_default().push(url);
     }
 
     pub fn get_backends(&self, service: &str) -> Vec<String> {
