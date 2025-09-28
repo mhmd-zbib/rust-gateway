@@ -24,6 +24,7 @@ dependencies = [
  "axum",
  "reqwest",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tokio",
  "tower 0.4.13",

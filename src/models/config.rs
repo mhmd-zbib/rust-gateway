@@ -11,9 +11,3 @@ pub struct Route {
     pub path: String,
     pub service: String,
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RegisterRequest {
-    pub service: String,
-    pub url: String,
-}
