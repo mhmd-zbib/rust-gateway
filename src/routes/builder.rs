@@ -1,5 +1,5 @@
 use crate::{
-    handlers::{health_handler, metrics_handler, proxy_handler, register_handler},
+    handlers::{auth_middleware, health_handler, metrics_handler, proxy_handler, register_handler},
     load_balancer::LoadBalancer,
     metrics::MetricsCollector,
     models::Config,
@@ -54,7 +54,8 @@ pub fn create_router(
                         .body(axum::body::Body::empty())
                         .unwrap(),
                 }
-            }),
+            })
+            .layer(axum::middleware::from_fn(auth_middleware)),
         );
     }
     router

@@ -1,4 +1,6 @@
 port: 3000
+auth:
+  jwt_secret: "your-secret-key"
 routes:
   - path: "/api/users"
     service: "users-service"
