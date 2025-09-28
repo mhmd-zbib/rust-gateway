@@ -1,7 +1,13 @@
-use axum::{body::Body, extract::Request, http::StatusCode, response::Response};
+use axum::{Json, body::Body, extract::Request, http::StatusCode, response::Response};
 use reqwest::Client;
+use std::sync::Arc;
 
-pub async fn proxy_handler(backend: String, req: Request) -> Result<Response<Body>, StatusCode> {
+use crate::{load_balancer::LoadBalancer, models::RegisterRequest, registry::Registry};
+
+pub async fn proxy_handler(
+    load_balancer: Arc<LoadBalancer>,
+    req: Request,
+) -> Result<Response<Body>, StatusCode> {
     let client = Client::new();
     let method = req.method().clone();
     let headers = req.headers().clone();
@@ -9,6 +15,9 @@ pub async fn proxy_handler(backend: String, req: Request) -> Result<Response<Bod
     let body_bytes = axum::body::to_bytes(req.into_body(), usize::MAX)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let backend = load_balancer
+        .next_backend()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let url = format!(
         "{}{}",
         backend,
@@ -27,6 +36,18 @@ pub async fn proxy_handler(backend: String, req: Request) -> Result<Response<Bod
     }
     let body = Body::from_stream(response.bytes_stream());
     builder
+        .body(body)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+pub async fn register_handler(
+    registry: Arc<Registry>,
+    Json(request): Json<RegisterRequest>,
+) -> Result<Response<Body>, StatusCode> {
+    registry.register(request.service, request.url);
+    let body = Body::from("Registered");
+    Response::builder()
+        .status(StatusCode::OK)
         .body(body)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }

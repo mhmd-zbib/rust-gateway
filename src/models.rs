@@ -9,5 +9,11 @@ pub struct Config {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Route {
     pub path: String,
-    pub backend: String,
+    pub service: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RegisterRequest {
+    pub service: String,
+    pub url: String,
 }
